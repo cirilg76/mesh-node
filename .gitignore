@@ -1,0 +1,9 @@
+# Données locales : mot de passe, sessions, messages, historiques — jamais publiées
+data/
+# Position réelle et réglages locaux (voir config.example.json)
+config.json
+
+# Environnement Python
+venv/
+__pycache__/
+*.pyc

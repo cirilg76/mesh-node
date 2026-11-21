@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon nœud Meshtastic</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--fg:#1d2330;--muted:#6b7385;--line:#e2e5eb;--accent:#0f8b6f;--accent-fg:#fff;
+  --danger:#c8382e;--warn:#b7791f;--chip:#eef1f5;--me:#dff3ec;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12151b;--card:#1b1f27;--fg:#e6e9ef;--muted:#949cad;
+  --line:#2b313c;--accent:#2bb594;--accent-fg:#06110e;--danger:#e5574c;--warn:#e0a43a;--chip:#252a34;--me:#173a31}}
+:root[data-theme="dark"]{--bg:#12151b;--card:#1b1f27;--fg:#e6e9ef;--muted:#949cad;--line:#2b313c;--accent:#2bb594;
+  --accent-fg:#06110e;--danger:#e5574c;--warn:#e0a43a;--chip:#252a34;--me:#173a31}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
+header h1{font-size:18px;margin:0;font-weight:650}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--chip);font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.pill.on{color:var(--accent)}.pill.on .dot{background:var(--accent)}
+.pill.err{color:var(--danger)}.pill.err .dot{background:var(--danger)}
+.grow{flex:1}
+a{color:var(--accent)}
+nav{display:flex;gap:2px;padding:0 12px;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{border:0;background:none;color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap}
+nav button.act{color:var(--fg);border-bottom-color:var(--accent)}
+nav .n{font-size:11px;background:var(--chip);border-radius:99px;padding:1px 6px;margin-left:4px}
+nav .n.new{background:var(--accent);color:var(--accent-fg)}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+button.danger{color:var(--danger)}
+button.sm{padding:3px 8px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 10px;font-weight:600}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+select,input,textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.check{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px}.check input{width:auto}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.grid2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+/* chat */
+.chat{display:grid;grid-template-columns:260px 1fr;gap:0;height:calc(100vh - 150px);min-height:420px;padding:0;overflow:hidden}
+@media (max-width:760px){.chat{grid-template-columns:1fr;height:auto}.convs{max-height:170px}.thread{height:60vh}}
+.convs{border-right:1px solid var(--line);overflow:auto}
+.conv{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.conv.act{background:var(--chip)}
+.conv .t{font-weight:600;display:flex;gap:6px;align-items:center}
+.conv .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{background:var(--accent);color:var(--accent-fg);border-radius:99px;font-size:11px;padding:0 6px;margin-left:auto}
+.thread{display:flex;flex-direction:column;min-width:0}
+.thead{padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
+.msgs{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.b{max-width:78%;padding:7px 11px;border-radius:12px;background:var(--chip);align-self:flex-start;word-wrap:break-word;white-space:pre-wrap}
+.b.out{background:var(--me);align-self:flex-end}
+.b .who{font-size:12px;font-weight:600;color:var(--accent)}
+.b .meta{font-size:11px;color:var(--muted);margin-top:2px}
+.composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.composer textarea{resize:none;height:42px}
+.cnt{font-size:11px;color:var(--muted);align-self:center;min-width:52px;text-align:right}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+.mono{font-family:var(--mono);font-size:12px}
+.tag{display:inline-block;padding:1px 7px;border-radius:99px;background:var(--chip);font-size:11px;color:var(--muted);white-space:nowrap}
+.tw{overflow-x:auto}
+.empty{color:var(--muted);text-align:center;padding:30px}
+#map{height:calc(100vh - 190px);min-height:400px;border-radius:8px}
+.err{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:none}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:2000}
+.toast.show{opacity:1}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.kv span:nth-child(odd){color:var(--muted)}
+#qr{background:#fff;padding:10px;border-radius:8px;display:inline-block;margin-top:8px}
+.trace{font-size:13px;margin-top:4px}
+.sig{display:inline-flex;align-items:flex-end;gap:1px;height:11px;margin-left:4px;vertical-align:-1px}
+.sig i{display:block;width:3px;background:var(--line);border-radius:1px}
+.sig i:nth-child(1){height:3px}.sig i:nth-child(2){height:5px}.sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:11px}
+.sig.q4 i,.sig.q3 i.on{background:var(--accent)}.sig.q2 i.on{background:var(--warn)}.sig.q1 i.on{background:var(--danger)}
+/* graphiques */
+.chart{position:relative}.chart svg{display:block;width:100%;overflow:visible}
+.chart .ax{font-size:10px;fill:var(--muted);font-family:var(--mono)}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ln{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .ar{fill:var(--accent);opacity:.12}
+.chart .br{fill:var(--accent)}.chart .br:hover,.chart .br.h{opacity:.75}
+.chart .xh{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.chart .pt{fill:var(--accent);stroke:var(--card);stroke-width:2}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none;z-index:5}
+.ctitle{font-size:13px;font-weight:600;margin:12px 0 4px;display:flex;justify-content:space-between;gap:8px}
+.ctitle span{white-space:nowrap;font-weight:400;color:var(--muted);font-family:var(--mono);font-size:12px}
+.nodata{color:var(--muted);font-size:13px;padding:14px 0;text-align:center}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:var(--chip);border-radius:10px;padding:10px 12px}.tile b{display:block;font-size:22px;line-height:1.2}.tile small{color:var(--muted);font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;padding:4px 10px;font-size:12px}.seg button.act{background:var(--accent);color:var(--accent-fg)}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}.cardhead h2{margin:0}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);padding:0;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:16px}.dlghead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.lnk{background:none;border:0;padding:0;color:var(--fg);font-weight:700;cursor:pointer;text-align:left}.lnk:hover{color:var(--accent);text-decoration:underline}
+.tag.new{background:var(--accent);color:var(--accent-fg)}
+/* réponses et réactions */
+.b{position:relative}
+.quote{font-size:12px;color:var(--muted);border-left:3px solid var(--accent);padding:1px 7px;margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.reacts{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.reacts span{background:var(--card);border:1px solid var(--line);border-radius:99px;font-size:12px;padding:0 6px;cursor:default}
+.macts{position:absolute;top:-12px;right:6px;display:none;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:1px 4px}
+.b:hover .macts,.b:focus-within .macts{display:flex}
+.b:focus{outline:2px solid var(--accent);outline-offset:1px}
+.macts button{border:0;background:none;padding:1px 4px;font-size:13px}
+.picker{display:flex;gap:2px}
+.replybar{display:none;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.replybar.on{display:flex}.replybar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.legend .l{width:18px;height:3px;border-radius:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>📟 <span id="myname">Mon nœud</span></h1>
+  <span id="pill" class="pill"><span class="dot"></span><span id="pilltxt">…</span></span>
+  <span id="batt" class="pill" hidden></span>
+  <span class="grow"></span>
+  <a href="#" id="lnk8088" class="pill" hidden title="Écoute SDR avec le RSP1A">📡 LoRa Mesh (RSP1A)</a>
+  <a href="#" id="logout" class="pill" title="Se déconnecter">🔒 Déconnexion</a>
+</header>
+<nav id="nav">
+  <button data-t="chat" class="act">💬 Messages<span class="n" id="n_unread" hidden>0</span></button>
+  <button data-t="nodes">Nœuds<span class="n" id="n_nodes">0</span></button>
+  <button data-t="map">Carte</button>
+  <button data-t="pkts">Paquets</button>
+  <button data-t="stats">📊 Stats</button>
+  <button data-t="tools">🧪 Outils</button>
+  <button data-t="cfg">⚙️ Réglages</button>
+</nav>
+<main>
+  <div class="err" id="err"></div>
+
+  <section id="t_chat">
+    <div class="card chat">
+      <div class="convs" id="convs"></div>
+      <div class="thread">
+        <div class="thead" id="thead">…</div>
+        <div class="msgs" id="msgs"></div>
+        <div class="replybar" id="replybar">↩ <span id="replytxt"></span><button class="sm" id="replycancel" aria-label="Annuler la réponse">✕</button></div>
+        <div class="composer">
+          <textarea id="txt" placeholder="Écrire un message…" maxlength="200" aria-label="Message"></textarea>
+          <span class="cnt" id="cnt">0/200</span>
+          <button class="primary" id="send">Envoyer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t_nodes" hidden>
+    <div class="card tw" id="nodes"></div>
+    <div class="hint">Traceroute, position et télémétrie envoient une requête radio : la réponse peut prendre jusqu'à une minute. Respecte le temps d'antenne (1 % en Europe).</div>
+  </section>
+
+  <section id="t_map" hidden><div class="card">
+    <div class="row" style="flex:none;margin-bottom:8px;align-items:center">
+      <label class="check" style="margin:0;flex:none"><input type="checkbox" id="m_traces" checked> Traceroutes</label>
+      <label class="check" style="margin:0;flex:none"><input type="checkbox" id="m_direct" checked> Liaisons directes</label>
+      <span class="hint" style="margin:0" id="m_info"></span>
+    </div>
+    <div id="map"></div>
+    <div class="legend"><span>Signal :</span><span><i style="background:#0f8b6f"></i>bon</span><span><i style="background:#b7791f"></i>moyen</span>
+      <span><i style="background:#c8382e"></i>faible</span><span><i style="background:#8a93a6"></i>inconnu / via relais</span>
+      <span><i style="background:#2c5bd6"></i>mon nœud</span><span><i class="l" style="background:#0f8b6f"></i>liaison (couleur = SNR)</span></div>
+  </div></section>
+
+  <section id="t_pkts" hidden><div class="card tw" id="pkts"></div></section>
+
+  <section id="t_stats" hidden>
+    <div class="grid2">
+      <div class="card">
+        <div class="cardhead"><h2>Mon nœud</h2><div class="seg" data-seg="me"><button data-v="24" class="act">24 h</button><button data-v="168">7 j</button><button data-v="720">30 j</button></div></div>
+        <div id="s_me"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><h2>Réseau</h2></div>
+        <div class="tiles" id="s_tiles"></div>
+        <div class="ctitle">Nœuds entendus par jour<span>14 jours</span></div><div class="chart" id="s_days"></div>
+        <div class="ctitle">Activité par heure<span>paquets, 7 derniers jours</span></div><div class="chart" id="s_hours"></div>
+      </div>
+      <div class="card">
+        <h2>Reçus en direct (0 saut) — par distance</h2>
+        <div class="tw" id="s_direct"></div>
+      </div>
+      <div class="card">
+        <h2>Les plus actifs (7 j)</h2><div class="tw" id="s_top"></div>
+        <h2 style="margin-top:16px">Nouveaux nœuds (7 j)</h2><div class="tw" id="s_new"></div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <div class="cardhead"><h2>Heltec ⇄ SDR RSP1A</h2><div class="seg" data-seg="cmp"><button data-v="6">6 h</button><button data-v="24" class="act">24 h</button><button data-v="168">7 j</button></div></div>
+        <div id="s_cmp"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t_tools" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Test de portée</h2>
+        <div class="hint" style="margin:0 0 6px">Envoie une série de messages directs avec accusé de réception vers un nœud et mesure combien arrivent. Le destinataire verra les messages « Test de portée n/N ».</div>
+        <label for="rt_to">Destinataire</label><select id="rt_to"></select>
+        <div class="row">
+          <div><label for="rt_int">Intervalle</label><select id="rt_int"><option value="30">30 s</option><option value="60" selected>1 min</option><option value="120">2 min</option><option value="300">5 min</option></select></div>
+          <div><label for="rt_n">Nombre</label><select id="rt_n"><option>5</option><option selected>10</option><option>20</option><option>30</option></select></div>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="primary" id="rt_go">Lancer</button><button id="rt_stop" disabled>Arrêter</button></div>
+        <div class="hint">Temps d'antenne : en Europe la limite est de 1 %. Un message LongFast ≈ 1 s → reste au-delà de 30 s d'intervalle.</div>
+        <div id="rt_res" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>Sauvegarde de la configuration</h2>
+        <div class="hint" style="margin:0 0 8px">Nom, radio LoRa, rôle, position et canaux (avec leurs clés — garde le fichier en lieu sûr).</div>
+        <a href="/api/backup" download><button class="primary">⬇️ Télécharger la sauvegarde</button></a>
+        <label for="bk_file" style="margin-top:16px">Restaurer depuis un fichier</label>
+        <input type="file" id="bk_file" accept=".json,application/json">
+        <div id="bk_info" class="hint"></div>
+        <div id="bk_parts" hidden>
+          <label class="check"><input type="checkbox" value="channels" checked> Canaux</label>
+          <label class="check"><input type="checkbox" value="owner" checked> Nom</label>
+          <label class="check"><input type="checkbox" value="position" checked> Position</label>
+          <label class="check"><input type="checkbox" value="device" checked> Rôle</label>
+          <label class="check"><input type="checkbox" value="lora" checked> Radio LoRa</label>
+          <div style="margin-top:10px"><button class="danger" id="bk_go">Restaurer</button></div>
+          <div class="hint">Le nœud peut redémarrer pendant la restauration.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Notifications sur le téléphone</h2>
+        <label class="check"><input type="checkbox" id="nf_en"> Activer les notifications</label>
+        <label for="nf_srv">Service</label>
+        <select id="nf_srv"><option value="ntfy">ntfy (appli ntfy sur Android)</option><option value="telegram">Telegram (bot)</option></select>
+        <div id="nf_ntfy">
+          <label for="nf_url">Serveur ntfy</label><input id="nf_url" placeholder="https://ntfy.sh">
+          <label for="nf_topic">Sujet (topic)</label><div class="row" style="flex-wrap:nowrap"><input id="nf_topic" placeholder="ex. mesh-…"><button id="nf_gen" style="flex:none" title="Générer un nom difficile à deviner">🎲</button></div>
+          <label for="nf_tok">Jeton d'accès (facultatif)</label><input id="nf_tok" type="password" autocomplete="off">
+          <div class="hint">Sur ntfy.sh public, toute personne qui connaît le sujet peut lire les notifications : choisis un nom long et aléatoire (🎲). Dans l'appli ntfy, abonne-toi au même sujet.</div>
+        </div>
+        <div id="nf_tg" hidden>
+          <label for="nf_tgtok">Jeton du bot (de @BotFather)</label><input id="nf_tgtok" type="password" autocomplete="off">
+          <label for="nf_chat">chat_id</label><input id="nf_chat" inputmode="numeric">
+          <div class="hint">Crée un bot avec @BotFather, envoie-lui un message, puis récupère ton chat_id via @userinfobot.</div>
+        </div>
+        <label>Me prévenir pour</label>
+        <label class="check"><input type="checkbox" id="nf_dm"> Messages directs reçus</label>
+        <label class="check"><input type="checkbox" id="nf_ch"> Messages sur les canaux</label>
+        <label class="check"><input type="checkbox" id="nf_new"> Nouveau nœud dans le secteur</label>
+        <label class="check"><input type="checkbox" id="nf_re"> Réactions emoji</label>
+        <div class="row" style="margin-top:10px"><button class="primary" id="nf_save">Enregistrer</button><button id="nf_test">Envoyer un test</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t_cfg" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Identité</h2>
+        <div class="kv" id="info"></div>
+        <label for="o_long">Nom long</label><input id="o_long" maxlength="39">
+        <label for="o_short">Nom court (4 car. max)</label><input id="o_short" maxlength="4">
+        <div style="margin-top:10px"><button class="primary" data-save="owner">Enregistrer</button></div>
+      </div>
+      <div class="card">
+        <h2>Radio LoRa</h2>
+        <div class="row">
+          <div><label for="l_region">Région</label><select id="l_region"></select></div>
+          <div><label for="l_preset">Préréglage</label><select id="l_preset"></select></div>
+        </div>
+        <div class="row">
+          <div><label for="l_hop">Nombre de sauts</label><select id="l_hop"></select></div>
+          <div><label for="l_pow">Puissance TX (dBm, 0 = défaut)</label><input id="l_pow" type="number" min="0" max="30"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="l_tx"> Émission activée</label>
+        <div class="hint">Changer la région ou le préréglage redémarre le nœud. Tous les nœuds d'un même réseau doivent avoir le même préréglage.</div>
+        <div style="margin-top:10px"><button class="primary" data-save="lora">Enregistrer</button></div>
+      </div>
+      <div class="card">
+        <h2>Rôle & position</h2>
+        <label for="d_role">Rôle de l'appareil</label><select id="d_role"></select>
+        <div class="hint">CLIENT convient presque toujours. ROUTER seulement pour un nœud fixe en point haut.</div>
+        <div style="margin-top:8px"><button data-save="device">Enregistrer le rôle</button></div>
+        <label for="p_secs">Diffusion de la position</label>
+        <select id="p_secs"><option value="0">par défaut (15 min)</option><option value="300">5 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option><option value="21600">6 h</option><option value="43200">12 h</option></select>
+        <label for="p_gps">GPS</label><select id="p_gps"></select>
+        <div style="margin-top:8px"><button data-save="posconf">Enregistrer</button></div>
+        <label>Position fixe (sans GPS)</label>
+        <div class="row"><input id="p_lat" placeholder="latitude" inputmode="decimal"><input id="p_lon" placeholder="longitude" inputmode="decimal"><input id="p_alt" placeholder="alt. m" inputmode="numeric" style="max-width:90px"></div>
+        <div class="row" style="margin-top:8px"><button data-save="fixpos">Définir</button><button id="p_here" hidden>Chez moi</button><button class="danger" data-save="clearpos">Retirer</button></div>
+        <div class="hint" id="p_state"></div>
+      </div>
+      <div class="card">
+        <h2>Canaux</h2>
+        <div class="tw" id="chans"></div>
+        <details style="margin-top:10px"><summary style="cursor:pointer">Ajouter / modifier un canal</summary>
+          <label for="c_idx">Canal</label><select id="c_idx"></select>
+          <label for="c_name">Nom (11 car. max, vide = nom du préréglage pour le principal)</label><input id="c_name" maxlength="11">
+          <label for="c_psk">Clé</label>
+          <select id="c_pskmode"><option value="">inchangée</option><option value="default">clé par défaut publique (AQ==)</option><option value="random">nouvelle clé aléatoire AES-256</option><option value="none">aucun chiffrement</option><option value="custom">saisir une clé base64…</option></select>
+          <input id="c_psk" placeholder="clé base64" hidden style="margin-top:6px">
+          <label for="c_prec">Précision de position partagée</label>
+          <select id="c_prec"><option value="">inchangée</option><option value="0">ne pas partager</option><option value="32">exacte</option><option value="16">~ 360 m</option><option value="14">~ 1,5 km</option><option value="13">~ 2,9 km</option><option value="11">~ 12 km</option></select>
+          <div class="row" style="margin-top:10px"><button class="primary" data-save="channel">Enregistrer</button><button class="danger" id="c_del">Supprimer</button></div>
+        </details>
+        <label>Lien de partage (à scanner avec l'appli Meshtastic)</label>
+        <input id="url" readonly onclick="this.select()">
+        <div id="qr"></div>
+        <details style="margin-top:10px"><summary style="cursor:pointer">Importer un lien de canaux</summary>
+          <input id="seturl" placeholder="https://meshtastic.org/e/#…" style="margin-top:6px">
+          <div class="hint">Remplace tous les canaux par ceux du lien.</div>
+          <div style="margin-top:8px"><button data-save="seturl">Importer</button></div>
+        </details>
+      </div>
+      <div class="card">
+        <h2>Appareil</h2>
+        <div class="row"><button id="reconnect">Reconnecter l'USB</button><button class="danger" id="reboot">Redémarrer le nœud</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<dialog id="dlg"><div class="dlg">
+  <div class="dlghead"><div><h2 id="d_title" style="margin:0;font-size:18px"></h2><div class="hint" id="d_sub" style="margin:2px 0 0"></div></div>
+    <button class="sm" onclick="dlg.close()" aria-label="Fermer">✕</button></div>
+  <div class="row" style="margin-top:10px;align-items:center">
+    <div class="seg" data-seg="node" style="flex:none"><button data-v="24" class="act">24 h</button><button data-v="168">7 j</button><button data-v="720">30 j</button></div>
+    <span class="hint" id="d_count" style="margin:0"></span>
+  </div>
+  <div id="d_body"></div>
+</div></dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let ST = null, NODES = [], NB = {}, MSGS = [], lastMsg = 0, lastPkt = 0, PKTS = [], conv = 'ch:0', formDone = false, TRACES = {};
+const seen = JSON.parse(localStorage.getItem('seen') || '{}');
+$('#logout').onclick = async e => { e.preventDefault(); await fetch('/api/logout', {method:'POST'}); location.replace('/login'); };
+
+function toast(t){ const e = $('#toast'); e.textContent = t; e.classList.add('show'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('show'), 3500); }
+async function api(path, body){
+  const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {});
+  if (r.status === 401) { location.replace('/login'); throw new Error('non connecté'); }
+  const j = await r.json(); if (!r.ok || j.ok === false) throw new Error(j.error || r.statusText); return j;
+}
+async function act(path, body, okmsg){ try { await api(path, body); if (okmsg) toast(okmsg); setTimeout(refreshStatus, 800); return true; } catch(e){ toast('⚠️ ' + e.message); return false; } }
+const fmtT = ts => { const d = new Date(ts*1000), n = new Date(); const t = d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  return d.toDateString() === n.toDateString() ? t : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' + t; };
+const ago = ts => { if (!ts) return '–'; const s = Date.now()/1000 - ts; if (s < 90) return 'à l\'instant'; if (s < 3600) return Math.floor(s/60) + ' min';
+  if (s < 86400) return Math.floor(s/3600) + ' h'; return Math.floor(s/86400) + ' j'; };
+const nm = id => { const n = NB[id]; return n ? (n.long_name || n.short_name || id) : (id || '?'); };
+const sigHtml = (q, val) => { const lbl = ['très faible','faible','moyen','bon','excellent'][q];
+  return `<span class="sig q${q}" title="Signal ${lbl} (${val})" role="img" aria-label="Signal ${lbl}">${[1,2,3,4].map(i => `<i class="${i <= q ? 'on' : ''}"></i>`).join('')}</span>`; };
+const sigBars = rssi => { if (rssi == null || rssi === 0) return '';
+  return sigHtml(rssi >= -90 ? 4 : rssi >= -105 ? 3 : rssi >= -115 ? 2 : rssi >= -125 ? 1 : 0, rssi + ' dBm'); };
+const snrBars = snr => { if (snr == null) return '';
+  return sigHtml(snr >= 5 ? 4 : snr >= 0 ? 3 : snr >= -7 ? 2 : snr >= -13 ? 1 : 0, 'SNR ' + snr + ' dB'); };
+const myId = () => ST?.me?.id;
+const snrQ = snr => snr == null ? -1 : snr >= 5 ? 4 : snr >= 0 ? 3 : snr >= -7 ? 2 : snr >= -13 ? 1 : 0;
+const qColor = q => q < 0 ? '#8a93a6' : q >= 3 ? '#0f8b6f' : q === 2 ? '#b7791f' : '#c8382e';
+const fmtN = (v, d = 1) => v == null ? '–' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits: d});
+function geo(a, b){ // distance km + cap
+  const R = 6371, r = x => x * Math.PI / 180, dLat = r(b[0] - a[0]), dLon = r(b[1] - a[1]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(dLon/2)**2;
+  const y = Math.sin(dLon) * Math.cos(r(b[0])), x = Math.cos(r(a[0])) * Math.sin(r(b[0])) - Math.sin(r(a[0])) * Math.cos(r(b[0])) * Math.cos(dLon);
+  const brg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  return {km: 2 * R * Math.asin(Math.sqrt(h)), brg, dir: ['N','NE','E','SE','S','SO','O','NO'][Math.round(brg / 45) % 8]};
+}
+const myPos = () => { const p = ST?.me?.position; return p && p.latitude ? [p.latitude, p.longitude] : null; };
+const nodeGeo = n => { const me = myPos(); return me && n && n.lat && n.lon && !n.me ? geo(me, [n.lat, n.lon]) : null; };
+const geoTxt = g => g ? `${fmtN(g.km, g.km < 10 ? 1 : 0)} km ${g.dir}` : '–';
+
+// --- graphiques SVG (une série, survol avec info-bulle)
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent){ const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function niceTicks(lo, hi, n = 3){ const span = hi - lo || 1, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0); const t = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) t.push(+v.toFixed(6)); return t; }
+function chartBase(el, h){ el.innerHTML = ''; const W = Math.max(260, el.clientWidth || 600);
+  const svg = svgEl('svg', {viewBox: `0 0 ${W} ${h}`, height: h, role: 'img'}, el);
+  const tip = document.createElement('div'); tip.className = 'tip'; el.appendChild(tip); return {W, svg, tip}; }
+function lineChart(el, pts, o = {}){
+  pts = pts.filter(p => p[1] != null);
+  if (pts.length < 2) { el.innerHTML = `<div class="nodata">${pts.length ? 'Une seule mesure pour l\'instant.' : 'Pas encore de données sur cette période.'}</div>`; return; }
+  const H = o.h || 110, m = {l: 38, r: 10, t: 8, b: 18};
+  const {W, svg, tip} = chartBase(el, H);
+  svg.setAttribute('aria-label', o.label || 'graphique');
+  const t0 = o.t0 ?? pts[0][0], t1 = Math.max(pts[pts.length - 1][0], t0 + 1);
+  let lo = Math.min(...pts.map(p => p[1])), hi = Math.max(...pts.map(p => p[1]));
+  if (o.min != null) lo = Math.min(lo, o.min); if (o.max != null) hi = Math.max(hi, o.max);
+  if (hi - lo < (o.minSpan || 1)) { const c = (hi + lo) / 2; lo = c - (o.minSpan || 1) / 2; hi = c + (o.minSpan || 1) / 2; }
+  const ticks = niceTicks(lo, hi); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const X = t => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r), Y = v => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  ticks.forEach(v => { svgEl('line', {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: 'gl'}, svg);
+    svgEl('text', {x: m.l - 5, y: Y(v) + 3, 'text-anchor': 'end', class: 'ax'}, svg).textContent = fmtN(v, 2); });
+  const span = t1 - t0, fx = t => { const d = new Date(t * 1000);
+    return span <= 36 * 3600 ? d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : d.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'}); };
+  for (let i = 0; i < 4; i++) { const t = t0 + span * (i + .5) / 4;
+    svgEl('text', {x: X(t), y: H - 4, 'text-anchor': 'middle', class: 'ax'}, svg).textContent = fx(t); }
+  const gap = o.gap || Math.max(3600, span / 25); let d = '', a = '', seg = [];
+  const flush = () => { if (!seg.length) return; d += 'M' + seg.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('L');
+    if (o.area) a += `M${X(seg[0][0]).toFixed(1)},${Y(lo)}L` + seg.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('L') + `L${X(seg[seg.length-1][0]).toFixed(1)},${Y(lo)}Z`;
+    if (seg.length === 1) svgEl('circle', {cx: X(seg[0][0]), cy: Y(seg[0][1]), r: 2, class: 'pt'}, svg); seg = []; };
+  pts.forEach((p, i) => { if (i && p[0] - pts[i - 1][0] > gap) flush(); seg.push(p); }); flush();
+  if (a) svgEl('path', {d: a, class: 'ar'}, svg);
+  svgEl('path', {d, class: 'ln'}, svg);
+  const xh = svgEl('line', {y1: m.t, y2: H - m.b, class: 'xh', visibility: 'hidden'}, svg);
+  const dot = svgEl('circle', {r: 4, class: 'pt', visibility: 'hidden'}, svg);
+  const ov = svgEl('rect', {x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: 'transparent'}, svg);
+  const move = ev => { const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width;
+    let best = pts[0], bd = 1e18; for (const p of pts) { const dd = Math.abs(X(p[0]) - x); if (dd < bd) { bd = dd; best = p; } }
+    const px = X(best[0]), py = Y(best[1]); xh.setAttribute('x1', px); xh.setAttribute('x2', px); dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+    xh.setAttribute('visibility', 'visible'); dot.setAttribute('visibility', 'visible');
+    tip.style.display = 'block'; tip.style.left = (px * r.width / W) + 'px'; tip.style.top = (py * r.height / H) + 'px';
+    tip.textContent = `${fmtN(best[1], o.dec ?? 1)} ${o.unit || ''} · ${new Date(best[0] * 1000).toLocaleString('fr-FR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}`; };
+  ov.addEventListener('pointermove', move); ov.addEventListener('pointerdown', move);
+  ov.addEventListener('pointerleave', () => { xh.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; });
+}
+function barChart(el, items, o = {}){
+  if (!items.length || items.every(i => !i.v)) { el.innerHTML = '<div class="nodata">Pas encore de données.</div>'; return; }
+  const H = o.h || 110, m = {l: 30, r: 6, t: 8, b: 18};
+  const {W, svg, tip} = chartBase(el, H);
+  svg.setAttribute('aria-label', o.label || 'graphique en barres');
+  const hi = Math.max(...items.map(i => i.v)), ticks = niceTicks(0, hi), top = ticks[ticks.length - 1] || 1;
+  const Y = v => m.t + (top - v) / top * (H - m.t - m.b);
+  ticks.forEach(v => { svgEl('line', {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: 'gl'}, svg);
+    svgEl('text', {x: m.l - 5, y: Y(v) + 3, 'text-anchor': 'end', class: 'ax'}, svg).textContent = fmtN(v, 0); });
+  const bw = (W - m.l - m.r) / items.length, every = Math.ceil(items.length / (W / 46));
+  items.forEach((it, i) => { const x = m.l + i * bw + 1, w = Math.max(2, bw - 2), y = Y(it.v), h = H - m.b - y;
+    if (it.v) svgEl('path', {d: `M${x},${H - m.b}V${y + Math.min(3, h)}q0,-3 3,-3h${w - 6}q3,0 3,3V${H - m.b}Z`, class: 'br'}, svg);
+    if (i % every === 0) svgEl('text', {x: x + w / 2, y: H - 4, 'text-anchor': 'middle', class: 'ax'}, svg).textContent = it.label;
+    const hit = svgEl('rect', {x: m.l + i * bw, y: m.t, width: bw, height: H - m.t - m.b, fill: 'transparent'}, svg);
+    const show = () => { const r = svg.getBoundingClientRect(); tip.style.display = 'block';
+      tip.style.left = ((x + w / 2) * r.width / W) + 'px'; tip.style.top = (y * r.height / H) + 'px'; tip.textContent = it.tip || `${it.label} : ${it.v}`; };
+    hit.addEventListener('pointerenter', show); hit.addEventListener('pointerdown', show);
+    hit.addEventListener('pointerleave', () => tip.style.display = 'none'); });
+}
+// sélecteurs de période
+const SEG = {me: 24, cmp: 24, node: 24};
+document.querySelectorAll('[data-seg]').forEach(g => g.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+  g.querySelectorAll('button').forEach(x => x.classList.toggle('act', x === b)); SEG[g.dataset.seg] = +b.dataset.v;
+  ({me: renderMe, cmp: renderCompare, node: () => openNode(dlgNode)})[g.dataset.seg](); }));
+
+// ------------------------------------------------------------------ état
+async function refreshStatus(){
+  try { ST = await api('/api/status'); } catch(e){ $('#pilltxt').textContent = 'serveur injoignable'; $('#pill').className = 'pill err'; return; }
+  const c = ST.connected;
+  $('#pill').className = 'pill ' + (c ? 'on' : 'err');
+  $('#pilltxt').textContent = c ? `Connecté · ${ST.lora.region} · ${ST.lora.modem_preset}` : 'Déconnecté';
+  const e = $('#err'); e.style.display = !c && ST.error ? 'block' : 'none'; e.textContent = (ST.error || '') + (ST.dev ? ` (${ST.dev})` : '');
+  if (ST.sdr_port) { $('#lnk8088').hidden = false; $('#lnk8088').href = location.protocol + '//' + location.hostname + ':' + ST.sdr_port + '/'; }
+  if (!c) return;
+  $('#myname').textContent = ST.me.long_name || 'Mon nœud';
+  const m = ST.me.metrics || {};
+  const bt = $('#batt'); bt.hidden = m.batteryLevel == null;
+  bt.textContent = m.batteryLevel > 100 ? '🔌 secteur' : `🔋 ${m.batteryLevel} %` + (m.voltage ? ` · ${m.voltage.toFixed(2)} V` : '');
+  $('#info').innerHTML = [['ID', ST.me.id], ['Matériel', ST.me.hw], ['Firmware', ST.me.firmware || '–'], ['Port', ST.dev],
+    ['Utilisation canal', m.channelUtilization != null ? m.channelUtilization.toFixed(1) + ' %' : '–'],
+    ['Temps d\'antenne TX', m.airUtilTx != null ? m.airUtilTx.toFixed(2) + ' %' : '–']]
+    .map(([k,v]) => `<span>${k}</span><span class="mono">${esc(v)}</span>`).join('');
+  if (!formDone) fillForms();
+  renderChannels(); renderConvs();
+}
+function opts(sel, list, val){ const s = $(sel); s.innerHTML = ''; list.forEach(o => s.add(new Option(o, o))); if (val != null) s.value = val; }
+function fillForms(){
+  const o = ST.options;
+  $('#o_long').value = ST.me.long_name || ''; $('#o_short').value = ST.me.short_name || '';
+  opts('#l_region', o.regions, ST.lora.region); opts('#l_preset', o.presets, ST.lora.modem_preset);
+  opts('#l_hop', [1,2,3,4,5,6,7], ST.lora.hop_limit); $('#l_pow').value = ST.lora.tx_power; $('#l_tx').checked = ST.lora.tx_enabled;
+  opts('#d_role', o.roles, ST.device.role); opts('#p_gps', o.gps_modes, ST.position.gps_mode);
+  $('#p_secs').value = [0,300,900,1800,3600,21600,43200].includes(ST.position.broadcast_secs) ? ST.position.broadcast_secs : 0;
+  if (ST.home && ST.home.lat != null) { $('#p_here').hidden = false; $('#p_here').textContent = ST.home.name || 'Chez moi'; }
+  const p = ST.me.position || {};
+  $('#p_state').textContent = ST.position.fixed_position ? `Position fixe active : ${p.latitude?.toFixed(5)}, ${p.longitude?.toFixed(5)}` : 'Pas de position fixe.';
+  formDone = true;
+}
+function renderChannels(){
+  $('#chans').innerHTML = `<table><tr><th>#</th><th>Nom</th><th>Rôle</th><th>Clé</th><th>Position</th></tr>` + ST.channels.map(c =>
+    `<tr><td>${c.index}</td><td><b>${esc(c.name || '(' + ST.lora.modem_preset + ')')}</b></td><td><span class="tag">${c.role === 'PRIMARY' ? 'principal' : 'secondaire'}</span></td>
+     <td><span class="tag">${esc(c.psk_kind)}</span> <button class="sm" onclick="navigator.clipboard?.writeText('${esc(c.psk)}');toast('Clé copiée')">copier</button></td>
+     <td>${c.precision ? (c.precision >= 32 ? 'exacte' : c.precision + ' bits') : 'non partagée'}</td></tr>`).join('') + '</table>';
+  const ci = $('#c_idx'), cur = ci.value; ci.innerHTML = '';
+  ST.channels.forEach(c => ci.add(new Option(`${c.index} — ${c.name || '(principal)'}`, c.index)));
+  if (ST.channels.length < 8) ci.add(new Option('+ nouveau canal', ''));
+  if (cur !== '' && [...ci.options].some(o => o.value === cur)) ci.value = cur;
+  if ($('#url').value !== (ST.url || '')){
+    $('#url').value = ST.url || ''; $('#qr').innerHTML = '';
+    if (ST.url && window.QRCode) new QRCode($('#qr'), {text: ST.url, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.L});
+  }
+}
+$('#c_idx').addEventListener('change', () => { const c = ST.channels.find(x => String(x.index) === $('#c_idx').value); $('#c_name').value = c ? c.name : ''; });
+$('#c_pskmode').addEventListener('change', () => $('#c_psk').hidden = $('#c_pskmode').value !== 'custom');
+
+// ------------------------------------------------------------------ réglages
+const SAVE = {
+  owner: () => act('/api/owner', {long_name: $('#o_long').value, short_name: $('#o_short').value}, 'Nom enregistré'),
+  lora: () => confirm('Enregistrer la configuration radio ? Le nœud peut redémarrer.') &&
+    act('/api/lora', {region: $('#l_region').value, modem_preset: $('#l_preset').value, hop_limit: +$('#l_hop').value,
+      tx_power: +$('#l_pow').value || 0, tx_enabled: $('#l_tx').checked}, 'Configuration radio envoyée'),
+  device: () => act('/api/device', {role: $('#d_role').value}, 'Rôle enregistré (redémarrage du nœud)'),
+  posconf: () => act('/api/position', {broadcast_secs: +$('#p_secs').value, gps_mode: $('#p_gps').value}, 'Réglages de position enregistrés'),
+  fixpos: () => act('/api/position', {lat: $('#p_lat').value.replace(',','.'), lon: $('#p_lon').value.replace(',','.'), alt: $('#p_alt').value}, 'Position fixe définie'),
+  clearpos: () => act('/api/position', {clear: true}, 'Position fixe retirée'),
+  channel: () => { const m = $('#c_pskmode').value;
+    return act('/api/channel', {index: $('#c_idx').value, name: $('#c_name').value, psk: m === 'custom' ? $('#c_psk').value : m,
+      precision: $('#c_prec').value}, 'Canal enregistré'); },
+  seturl: () => confirm('Remplacer tous les canaux par ceux du lien ?') && act('/api/seturl', {url: $('#seturl').value}, 'Canaux importés'),
+};
+document.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', async () => { b.disabled = true; await SAVE[b.dataset.save](); b.disabled = false; formDone = false; }));
+$('#p_here').addEventListener('click', () => { const h = ST.home; $('#p_lat').value = h.lat; $('#p_lon').value = h.lon; $('#p_alt').value = h.alt ?? ''; });
+$('#c_del').addEventListener('click', () => { const i = $('#c_idx').value; if (i && confirm('Supprimer le canal ' + i + ' ?')) act('/api/channel/delete', {index: +i}, 'Canal supprimé'); });
+$('#reboot').addEventListener('click', () => confirm('Redémarrer le nœud ?') && act('/api/reboot', {}, 'Redémarrage dans 5 s'));
+$('#reconnect').addEventListener('click', () => act('/api/reconnect', {}, 'Reconnexion…'));
+
+// ------------------------------------------------------------------ messages
+const convOf = m => {
+  const bc = !m.dst || m.dst === '!ffffffff' || m.dst === '^all';
+  if (bc) return 'ch:' + (m.channel || 0);
+  return 'dm:' + (m.dir === 'out' ? m.dst : m.src);
+};
+async function refreshMessages(){
+  let r; try { r = await api('/api/messages?after=' + lastMsg); } catch(e){ return; }
+  let added = false;
+  r.messages.forEach(m => { MSGS.push(m); lastMsg = Math.max(lastMsg, m.id); added = true; });
+  let changed = false;
+  for (const [id, st] of Object.entries(r.status)) { const m = MSGS.find(x => x.id == id); if (m && m.status !== st) { m.status = st; changed = true; } }
+  if (added || changed) { renderConvs(); renderThread(added); }
+}
+const isReact = m => m.emoji && m.reply_id;
+function renderConvs(){
+  if (!ST || !ST.connected) return;
+  const list = [];
+  ST.channels.forEach(c => list.push({key: 'ch:' + c.index, title: '# ' + (c.name || ST.lora.modem_preset), sub: c.psk_kind === 'défaut' ? 'canal public' : 'canal privé'}));
+  const dms = new Set(MSGS.map(convOf).filter(k => k.startsWith('dm:')));
+  if (conv.startsWith('dm:')) dms.add(conv);
+  dms.forEach(k => list.push({key: k, title: '✉️ ' + nm(k.slice(3)), sub: 'message direct'}));
+  let unreadTotal = 0;
+  $('#convs').innerHTML = list.map(c => {
+    const ms = MSGS.filter(m => convOf(m) === c.key && !isReact(m));
+    const last = ms[ms.length - 1];
+    const unread = ms.filter(m => m.dir === 'in' && m.id > (seen[c.key] || 0)).length;
+    if (c.key !== conv) unreadTotal += unread;
+    return `<div class="conv${c.key === conv ? ' act' : ''}" data-k="${esc(c.key)}"><div class="t">${esc(c.title)}${unread && c.key !== conv ? `<span class="badge">${unread}</span>` : ''}</div>
+      <div class="s">${last ? esc((last.dir === 'out' ? 'Moi : ' : nm(last.src).split(' ')[0] + ' : ') + last.text) : esc(c.sub)}</div></div>`; }).join('');
+  document.querySelectorAll('.conv').forEach(e => e.addEventListener('click', () => { conv = e.dataset.k; setReply(null); renderConvs(); renderThread(true); }));
+  const n = $('#n_unread'); n.hidden = !unreadTotal; n.textContent = unreadTotal; n.className = 'n new';
+  document.title = (unreadTotal ? `(${unreadTotal}) ` : '') + 'Mon nœud Meshtastic';
+}
+function renderThread(scroll){
+  if (!ST || !ST.connected) return;
+  const all = MSGS.filter(m => convOf(m) === conv), ms = all.filter(m => !isReact(m));
+  const byPkt = {}; MSGS.forEach(m => { if (m.pkt_id) byPkt[m.pkt_id] = m; });
+  const reacts = {}; all.filter(isReact).forEach(r => (reacts[r.reply_id] ||= []).push(r));
+  const quote = m => { if (!m.reply_id) return ''; const t = byPkt[m.reply_id];
+    return `<div class="quote">↩ ${t ? esc((t.dir === 'out' ? 'Moi' : nm(t.src)) + ' : ' + t.text) : 'réponse à un message'}</div>`; };
+  const chips = m => { const rs = reacts[m.pkt_id]; if (!rs) return ''; const g = {};
+    rs.forEach(r => (g[r.text] ||= []).push(r.dir === 'out' ? 'moi' : nm(r.src)));
+    return `<div class="reacts">${Object.entries(g).map(([e, w]) => `<span title="${esc(w.join(', '))}">${esc(e)}${w.length > 1 ? ' ' + w.length : ''}</span>`).join('')}</div>`; };
+  const acts = m => m.pkt_id ? `<div class="macts"><button data-re="${m.id}" title="Répondre" aria-label="Répondre">↩</button>${
+    ['👍','❤️','😂','😮','🙏'].map(e => `<button data-emo="${e}" data-id="${m.id}" title="Réagir ${e}">${e}</button>`).join('')}</div>` : '';
+  if (all.length) { seen[conv] = Math.max(seen[conv] || 0, ...all.map(m => m.id)); try { localStorage.setItem('seen', JSON.stringify(seen)); } catch(e){} }
+  const ch = conv.startsWith('ch:') ? ST.channels.find(c => 'ch:' + c.index === conv) : null;
+  $('#thead').textContent = ch ? `# ${ch.name || ST.lora.modem_preset} — à tous les nœuds du canal` : `✉️ ${nm(conv.slice(3))} — message direct`;
+  const box = $('#msgs');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.innerHTML = ms.length ? ms.map(m => m.dir === 'out'
+    ? `<div class="b out" tabindex="0">${acts(m)}${quote(m)}${esc(m.text)}${chips(m)}<div class="meta">${fmtT(m.ts)} · ${esc(m.status || '')}</div></div>`
+    : `<div class="b" tabindex="0">${acts(m)}<div class="who">${esc(nm(m.src))}</div>${quote(m)}${esc(m.text)}${chips(m)}<div class="meta">${fmtT(m.ts)}${m.snr != null ? ` · SNR ${m.snr} dB` : ''}${m.rssi ? ` · ${m.rssi} dBm${sigBars(m.rssi)}` : ''}${m.hops != null ? ` · ${m.hops} saut${m.hops > 1 ? 's' : ''}` : ''}</div></div>`).join('')
+    : '<div class="empty">Aucun message ici pour l\'instant.</div>';
+  if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+}
+$('#txt').addEventListener('input', () => $('#cnt').textContent = new TextEncoder().encode($('#txt').value).length + '/200');
+$('#txt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
+$('#send').addEventListener('click', sendMsg);
+let replyTo = null;
+function setReply(m){ replyTo = m; $('#replybar').classList.toggle('on', !!m);
+  if (m) { $('#replytxt').textContent = (m.dir === 'out' ? 'Moi' : nm(m.src)) + ' : ' + m.text; $('#txt').focus(); } }
+$('#replycancel').addEventListener('click', () => setReply(null));
+const convBody = () => conv.startsWith('ch:') ? {channel: +conv.slice(3)} : {to: conv.slice(3), channel: 0};
+$('#msgs').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.re) return setReply(MSGS.find(m => m.id == b.dataset.re));
+  if (b.dataset.emo) { const m = MSGS.find(x => x.id == b.dataset.id); if (!m) return;
+    if (await act('/api/send', {...convBody(), text: b.dataset.emo, reply_id: m.pkt_id, emoji: true})) refreshMessages(); }
+});
+async function sendMsg(){
+  const t = $('#txt').value.trim(); if (!t) return;
+  if (new TextEncoder().encode(t).length > 200) return toast('Message trop long');
+  const body = {...convBody(), text: t, ...(replyTo ? {reply_id: replyTo.pkt_id} : {})};
+  $('#send').disabled = true;
+  if (await act('/api/send', body)) { $('#txt').value = ''; $('#cnt').textContent = '0/200'; setReply(null); refreshMessages(); }
+  $('#send').disabled = false;
+}
+
+// ------------------------------------------------------------------ nœuds
+async function refreshNodes(){
+  try { NODES = await api('/api/nodes'); } catch(e){ return; }
+  try { TRACES = await api('/api/traces'); } catch(e){}
+  NB = {}; NODES.forEach(n => NB[n.id] = n);
+  $('#n_nodes').textContent = NODES.length;
+  $('#nodes').innerHTML = NODES.length ? `<table><tr><th>Nœud</th><th>Matériel</th><th>Vu</th><th>Sauts</th><th>SNR</th><th>Batterie</th><th>Distance</th><th>Actions</th></tr>` +
+    NODES.map(n => { const tr = TRACES[n.id];
+      const isNew = n.first_seen && Date.now()/1000 - n.first_seen < 86400 && !n.me;
+      return `<tr><td>${n.favorite ? '⭐ ' : ''}<button class="lnk" onclick="openNode('${n.id}')" title="Historique du signal">${esc(n.long_name || n.id)}</button> ${isNew ? '<span class="tag new">nouveau</span> ' : ''}${n.short_name ? `<span class="tag">${esc(n.short_name)}</span>` : ''}${n.me ? ' <span class="tag">moi</span>' : ''}${n.via_mqtt ? ' <span class="tag">MQTT</span>' : ''}
+        <div class="mono" style="color:var(--muted)">${esc(n.id)}</div>
+        ${tr ? `<div class="trace">🛰️ ${tr.status === 'ok' ? '→ ' + tr.forward.map(esc).join(' → ') + '<br>← ' + tr.back.map(esc).join(' → ') : esc(tr.status)} <span style="color:var(--muted)">(${ago(tr.ts)})</span></div>` : ''}</td>
+      <td>${esc(n.hw || '–')}${n.role && n.role !== 'CLIENT' ? `<div class="tag">${esc(n.role)}</div>` : ''}</td>
+      <td>${n.me ? '–' : ago(n.last_heard)}</td><td class="mono">${n.hops ?? '–'}</td><td class="mono" style="white-space:nowrap">${n.snr ?? '–'}${n.me ? '' : snrBars(n.snr)}</td>
+      <td>${n.battery != null ? (n.battery > 100 ? 'secteur' : n.battery + ' %') : '–'}</td>
+      <td class="mono" style="white-space:nowrap">${n.me ? (n.lat ? 'ici' : '–') : n.lat ? geoTxt(nodeGeo(n)) : '–'}</td>
+      <td>${n.me ? '' : `<button class="sm" onclick="openDM('${n.id}')">✉️</button>
+        <button class="sm" title="Traceroute" onclick="nodeAct('trace','${n.id}')">🛰️</button>
+        <button class="sm" title="Demander la position" onclick="nodeAct('position','${n.id}')">📍</button>
+        <button class="sm" title="Demander la télémétrie" onclick="nodeAct('telemetry','${n.id}')">🔋</button>
+        <button class="sm" title="Favori" onclick="nodeAct('${n.favorite ? 'unfavorite' : 'favorite'}','${n.id}')">${n.favorite ? '☆' : '⭐'}</button>
+        <button class="sm danger" title="Oublier ce nœud" onclick="nodeAct('remove','${n.id}')">✕</button>`}</td></tr>`; }).join('') + '</table>'
+    : '<div class="empty">Aucun nœud connu.</div>';
+  renderMap(); renderConvs();
+}
+function openDM(id){ conv = 'dm:' + id; showTab('chat'); renderConvs(); renderThread(true); $('#txt').focus(); }
+async function nodeAct(a, id){
+  if (a === 'remove' && !confirm('Oublier ce nœud de la base du nœud ?')) return;
+  if (a === 'trace') { await act('/api/traceroute', {to: id}, 'Traceroute envoyé, réponse sous ~1 min'); }
+  else await act('/api/node', {action: a, id}, {position: 'Demande de position envoyée', telemetry: 'Demande de télémétrie envoyée', favorite: 'Ajouté aux favoris', unfavorite: 'Retiré des favoris', remove: 'Nœud oublié'}[a]);
+  setTimeout(refreshNodes, 1500);
+}
+
+// ------------------------------------------------------------------ carte
+let map = null, layer = null;
+function renderMap(){
+  if ($('#t_map').hidden || typeof L === 'undefined') return;
+  if (!map){ const c = myPos() || (ST?.home?.lat != null ? [ST.home.lat, ST.home.lon] : null);
+    map = L.map('map').setView(c || [46.6, 2.5], c ? 9 : 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© OpenStreetMap'}).addTo(map);
+    layer = L.layerGroup().addTo(map); }
+  layer.clearLayers(); const pts = [], pos = {};
+  NODES.forEach(n => { if (n.lat && n.lon) pos[n.id] = [n.lat, n.lon]; });
+  const me = NODES.find(n => n.me), mePos = me && pos[me.id];
+  const link = (a, b, snr, label, dash) => { if (!pos[a] || !pos[b] || a === b) return;
+    const g = geo(pos[a], pos[b]);
+    L.polyline([pos[a], pos[b]], {color: qColor(snrQ(snr)), weight: 3, opacity: .8, dashArray: dash}).addTo(layer)
+      .bindTooltip(`${esc(nm(a))} → ${esc(nm(b))}<br>${snr != null ? 'SNR ' + fmtN(snr) + ' dB · ' : ''}${fmtN(g.km)} km${label ? '<br>' + label : ''}`, {sticky: true}); };
+  if ($('#m_direct').checked && mePos) NODES.filter(n => !n.me && n.hops === 0 && pos[n.id]).forEach(n => link(n.id, me.id, n.snr, 'reçu en direct', '6 6'));
+  if ($('#m_traces').checked) Object.values(TRACES).filter(t => t.status === 'ok' && t.forward_ids).forEach(t => {
+    t.forward_ids.forEach((id, i) => i && link(t.forward_ids[i - 1], id, t.snr_forward?.[i - 1], 'traceroute ' + ago(t.ts)));
+    (t.back_ids || []).forEach((id, i) => i && link(t.back_ids[i - 1], id, t.snr_back?.[i - 1], 'traceroute retour ' + ago(t.ts))); });
+  let shown = 0;
+  NODES.forEach(n => { if (!pos[n.id]) return; pts.push(pos[n.id]); shown++;
+    const g = nodeGeo(n), col = n.me ? '#2c5bd6' : n.hops === 0 ? qColor(snrQ(n.snr)) : '#8a93a6';
+    L.circleMarker(pos[n.id], {radius: n.me ? 9 : 7, color: '#fff', weight: 2, fillColor: col, fillOpacity: .95}).addTo(layer)
+      .bindPopup(`<b>${esc(n.long_name || n.id)}</b><br>${esc(n.hw || '')}<br>${n.me ? 'mon nœud' : 'vu ' + ago(n.last_heard) + ' · ' + (n.hops ?? '?') + ' saut(s)'
+        + (n.hops === 0 && n.snr != null ? ' · SNR ' + n.snr + ' dB' : '') + (g ? `<br>📏 ${fmtN(g.km)} km · cap ${Math.round(g.brg)}° (${g.dir})` : '')}
+        ${n.me ? '' : `<br><a href="#" onclick="openNode('${n.id}');return false">Historique du signal</a>`}`); });
+  $('#m_info').textContent = `${shown} nœud(s) positionné(s) sur ${NODES.length}`;
+  if (pts.length && !map._fit) { map.fitBounds(L.latLngBounds(pts).pad(0.3)); map._fit = true; }
+  setTimeout(() => map.invalidateSize(), 50);
+}
+$('#m_traces').addEventListener('change', renderMap); $('#m_direct').addEventListener('change', renderMap);
+
+// ------------------------------------------------------------------ paquets
+async function refreshPackets(){
+  let r; try { r = await api('/api/packets?after=' + lastPkt); } catch(e){ return; }
+  if (!r.length) return;
+  r.forEach(p => { PKTS.push(p); lastPkt = Math.max(lastPkt, p.seq); }); PKTS = PKTS.slice(-400);
+  if (r.some(p => p.port !== 'TEXT_MESSAGE_APP')) setTimeout(refreshNodes, 500);
+  if ($('#t_pkts').hidden) return;
+  renderPackets();
+}
+function renderPackets(){
+  $('#pkts').innerHTML = PKTS.length ? `<table><tr><th>Heure</th><th>De</th><th>Vers</th><th>Type</th><th>Contenu</th><th>SNR</th><th>RSSI</th><th>Sauts</th></tr>` +
+    PKTS.slice().reverse().map(p => `<tr><td class="mono">${new Date(p.ts*1000).toLocaleTimeString('fr-FR')}</td><td>${esc(nm(p.from))}</td>
+      <td>${p.to === '^all' || p.to === '!ffffffff' ? 'tous' : esc(nm(p.to))}</td><td><span class="tag">${esc((p.port || '').replace('_APP',''))}</span>${p.via_mqtt ? ' <span class="tag">MQTT</span>' : ''}</td>
+      <td>${esc(p.summary)}</td><td class="mono">${p.snr ?? '–'}</td><td class="mono" style="white-space:nowrap">${p.rssi ?? '–'}${sigBars(p.rssi)}</td><td class="mono">${p.hops ?? '–'}</td></tr>`).join('') + '</table>'
+    : '<div class="empty">Les paquets reçus par le nœud apparaîtront ici en direct.</div>';
+}
+
+// ------------------------------------------------------------------ fiche nœud
+const dlg = $('#dlg'); let dlgNode = null;
+function chartBlock(title, sub){ const id = 'c' + Math.random().toString(36).slice(2, 8);
+  return {html: `<div class="ctitle">${title}<span>${sub || ''}</span></div><div class="chart" id="${id}"></div>`, id}; }
+async function openNode(id){
+  if (!id) return; dlgNode = id; const n = NB[id] || {id};
+  $('#d_title').textContent = n.long_name || id;
+  const g = nodeGeo(n);
+  $('#d_sub').textContent = [id, n.hw, n.role, n.first_seen ? 'vu la 1re fois ' + new Date(n.first_seen * 1000).toLocaleDateString('fr-FR') : null,
+    g ? `${fmtN(g.km)} km au ${g.dir} (${Math.round(g.brg)}°)` : null].filter(Boolean).join(' · ');
+  if (!dlg.open) dlg.showModal();
+  $('#d_body').innerHTML = '<div class="nodata">Chargement…</div>';
+  let h; try { h = await api(`/api/history?node=${encodeURIComponent(id)}&hours=${SEG.node}`); } catch(e){ $('#d_body').innerHTML = `<div class="nodata">${esc(e.message)}</div>`; return; }
+  const t0 = Date.now()/1000 - SEG.node * 3600, rx = h.rx, te = h.telem;
+  $('#d_count').textContent = n.me ? `${te.length} mesures` : `${rx.length} paquet(s) reçu(s) par radio`;
+  const blocks = [];
+  if (!n.me) { blocks.push(['snr', chartBlock('SNR', 'dB · plus haut = mieux'), rx.map(r => [r[0], r[1]]), {unit: 'dB', minSpan: 4}]);
+    blocks.push(['rssi', chartBlock('Puissance reçue (RSSI)', 'dBm'), rx.map(r => [r[0], r[2] || null]), {unit: 'dBm', dec: 0, minSpan: 6}]);
+    blocks.push(['hops', chartBlock('Sauts', 'nombre de relais'), rx.map(r => [r[0], r[3]]), {unit: 'saut(s)', dec: 0, min: 0, minSpan: 2}]); }
+  const bat = te.filter(r => r[1] != null && r[1] <= 100);
+  if (bat.length) blocks.push(['bat', chartBlock('Batterie', '%'), bat.map(r => [r[0], r[1]]), {unit: '%', dec: 0, min: 0, max: 100, area: true}]);
+  if (te.some(r => r[2])) blocks.push(['v', chartBlock('Tension', 'V'), te.map(r => [r[0], r[2] || null]), {unit: 'V', dec: 2, minSpan: .2}]);
+  if (n.me) { blocks.push(['cu', chartBlock('Occupation du canal', '% du temps'), te.map(r => [r[0], r[3]]), {unit: '%', min: 0, minSpan: 2, area: true}]);
+    blocks.push(['at', chartBlock('Mon temps d\'émission', '% · limite UE 1 % (10 % en 869,4–869,65)'), te.map(r => [r[0], r[4]]), {unit: '%', dec: 2, min: 0, minSpan: .5}]); }
+  $('#d_body').innerHTML = blocks.map(b => b[1].html).join('') || '<div class="nodata">Aucune donnée.</div>';
+  blocks.forEach(b => lineChart($('#' + b[1].id), b[2], {...b[3], t0, label: b[0]}));
+}
+
+// ------------------------------------------------------------------ stats
+async function renderMe(){
+  const id = myId(); if (!id) return;
+  let h; try { h = await api(`/api/history?node=${encodeURIComponent(id)}&hours=${SEG.me}`); } catch(e){ return; }
+  const te = h.telem, t0 = Date.now()/1000 - SEG.me * 3600, bat = te.filter(r => r[1] != null && r[1] <= 100), usb = te.length && !bat.length;
+  const B = [chartBlock('Batterie', usb ? 'alimenté par USB' : '%'), chartBlock('Tension', 'V'), chartBlock('Occupation du canal', '% du temps'),
+    chartBlock('Mon temps d\'émission', '% de l\'heure')];
+  $('#s_me').innerHTML = (te.length ? '' : '<div class="hint">Une mesure est enregistrée toutes les 5 minutes : les courbes se rempliront au fil du temps.</div>') + B.map(b => b.html).join('');
+  if (usb) $('#' + B[0].id).innerHTML = '<div class="nodata">🔌 Sur secteur (USB) : pas de niveau de batterie.</div>';
+  else lineChart($('#' + B[0].id), bat.map(r => [r[0], r[1]]), {t0, unit: '%', dec: 0, min: 0, max: 100, area: true, label: 'batterie'});
+  lineChart($('#' + B[1].id), te.map(r => [r[0], r[2] || null]), {t0, unit: 'V', dec: 2, minSpan: .2, label: 'tension'});
+  lineChart($('#' + B[2].id), te.map(r => [r[0], r[3]]), {t0, unit: '%', min: 0, minSpan: 2, area: true, label: 'occupation du canal'});
+  lineChart($('#' + B[3].id), te.map(r => [r[0], r[4]]), {t0, unit: '%', dec: 2, min: 0, minSpan: .5, label: 'temps d\'émission'});
+}
+async function renderStats(){
+  renderMe();
+  let st; try { st = await api('/api/stats?days=14'); } catch(e){ return; }
+  const direct = st.direct.map(d => ({...d, n_: NB[d.node], g: nodeGeo(NB[d.node])})).sort((a, b) => (b.g?.km ?? -1) - (a.g?.km ?? -1));
+  const rec = direct.find(d => d.g);
+  $('#s_tiles').innerHTML = [
+    [st.nodes_seen, 'nœuds rencontrés'], [fmtN(st.total_packets, 0), 'paquets enregistrés' + (st.since ? ' depuis le ' + new Date(st.since * 1000).toLocaleDateString('fr-FR') : '')],
+    [rec ? fmtN(rec.g.km) + ' km' : '–', rec ? 'record direct : ' + esc(nm(rec.node)) : 'record de distance en direct'],
+    [st.new_nodes.length, 'nouveaux nœuds cette semaine']].map(([v, l]) => `<div class="tile"><b>${v}</b><small>${l}</small></div>`).join('');
+  const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5), k = d.toLocaleDateString('sv-SE');
+    const r = st.per_day.find(x => x.d === k); days.push({label: d.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'}), v: r ? r.n : 0,
+      tip: `${d.toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short'})} : ${r ? r.n : 0} nœud(s), ${r ? r.p : 0} paquets`}); }
+  barChart($('#s_days'), days, {label: 'nœuds par jour'});
+  barChart($('#s_hours'), st.hours.map((v, h) => ({label: h + 'h', v, tip: `${h}h–${h + 1}h : ${v} paquets`})), {label: 'activité par heure'});
+  $('#s_direct').innerHTML = direct.length ? `<table><tr><th>Nœud</th><th>Distance</th><th>Meilleur SNR</th><th>Paquets</th><th>Dernier</th></tr>` + direct.map(d =>
+    `<tr><td><button class="lnk" onclick="openNode('${esc(d.node)}')">${esc(nm(d.node))}</button></td><td class="mono">${geoTxt(d.g)}</td>
+     <td class="mono" style="white-space:nowrap">${fmtN(d.best_snr)} dB${snrBars(d.best_snr)}</td><td class="mono">${d.n}</td><td>${ago(d.last)}</td></tr>`).join('') + '</table>'
+    : '<div class="empty">Aucun paquet reçu en direct pour l\'instant.</div>';
+  $('#s_top').innerHTML = st.top.length ? '<table>' + st.top.map(t => `<tr><td><button class="lnk" onclick="openNode('${esc(t.node)}')">${esc(nm(t.node))}</button></td><td class="mono" style="text-align:right">${t.p} paquets</td></tr>`).join('') + '</table>' : '<div class="empty">–</div>';
+  $('#s_new').innerHTML = st.new_nodes.length ? '<table>' + st.new_nodes.map(t => `<tr><td><button class="lnk" onclick="openNode('${esc(t.id)}')">${esc(nm(t.id))}</button></td><td style="text-align:right">${fmtT(t.first_seen)}</td></tr>`).join('') + '</table>' : '<div class="empty">Aucun nouveau nœud cette semaine.</div>';
+  renderCompare();
+}
+async function renderCompare(){
+  let c; try { c = await api('/api/compare?hours=' + SEG.cmp); } catch(e){ $('#s_cmp').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (!c.configured) { $('#s_cmp').innerHTML = '<div class="empty">Comparaison non configurée : renseigne « lora_mesh » dans config.json (voir README).</div>'; return; }
+  if (!c.available) { $('#s_cmp').innerHTML = '<div class="empty">Base de l\'appli LoRa Mesh introuvable.</div>'; return; }
+  const state = c.sdr_running == null ? 'appli LoRa Mesh injoignable' : c.sdr_running ? `SDR en écoute (${esc(c.sdr_preset || '')})` : 'SDR arrêté';
+  if (!c.sdr) { $('#s_cmp').innerHTML = `<div class="hint">${state}</div><div class="empty">Le SDR n'a décodé aucun paquet sur cette période. Lance l'écoute sur <a href="${$('#lnk8088').href}">LoRa Mesh</a> pour comparer.</div>`; return; }
+  const diff = c.avg_snr_heltec != null ? c.avg_snr_heltec - c.avg_snr_sdr : null;
+  const verdict = diff == null ? '' : Math.abs(diff) < 1.5 ? 'Les deux récepteurs entendent à peu près aussi bien.'
+    : diff > 0 ? `L'Heltec reçoit en moyenne <b>${fmtN(diff)} dB de mieux</b> que le SDR sur les paquets communs.` : `Le SDR reçoit en moyenne <b>${fmtN(-diff)} dB de mieux</b> que l'Heltec : l'antenne ou l'emplacement de l'Heltec peut sans doute être amélioré.`;
+  $('#s_cmp').innerHTML = `<div class="hint" style="margin:0 0 8px">${state} · comparaison limitée à la période où le SDR a capté des paquets${c.window ? ` (${fmtT(c.window[0])} → ${fmtT(c.window[1])})` : ''}</div>
+    <div class="tiles">${[[c.heltec, 'reçus par l\'Heltec'], [c.sdr, 'décodés par le SDR'], [c.both, 'reçus par les deux'],
+      [c.heltec - c.both, 'seulement l\'Heltec'], [c.sdr - c.both, 'seulement le SDR'],
+      [c.avg_snr_heltec != null ? `${fmtN(c.avg_snr_heltec)} / ${fmtN(c.avg_snr_sdr)}` : '–', 'SNR moyen Heltec / SDR (dB)']].map(([v, l]) => `<div class="tile"><b>${v}</b><small>${l}</small></div>`).join('')}</div>
+    ${verdict ? `<p style="margin:10px 0 4px">${verdict}</p>` : ''}
+    <div class="tw" style="margin-top:8px"><table><tr><th>Nœud</th><th>Heltec</th><th>SDR</th><th>Communs</th><th>SNR Heltec</th><th>SNR SDR</th></tr>${c.nodes.map(r =>
+      `<tr><td>${esc(nm(r.node))}</td><td class="mono">${r.heltec}</td><td class="mono">${r.sdr}</td><td class="mono">${r.both}</td>
+       <td class="mono">${r.snr_h != null ? fmtN(r.snr_h) + snrBars(r.snr_h) : '–'}</td><td class="mono">${r.snr_s != null ? fmtN(r.snr_s) + snrBars(r.snr_s) : '–'}</td></tr>`).join('')}</table></div>
+    <div class="hint">Le SNR du SDR est estimé par le décodeur maison : compare surtout les écarts et les paquets manqués, pas les valeurs absolues. L'Heltec n'écoute que ses canaux, le SDR seulement le préréglage choisi.</div>`;
+}
+
+// ------------------------------------------------------------------ outils : test de portée
+let rtTimer = null;
+function fillRtNodes(){ const sel = $('#rt_to'), cur = sel.value; sel.innerHTML = '';
+  NODES.filter(n => !n.me).forEach(n => sel.add(new Option(`${n.long_name || n.id} (${n.hops === 0 ? 'direct' : (n.hops ?? '?') + ' saut(s)'}, vu ${ago(n.last_heard)})`, n.id)));
+  if (cur) sel.value = cur; }
+async function refreshRt(){
+  let r; try { r = await api('/api/rangetest'); } catch(e){ return; }
+  $('#rt_go').disabled = r.running; $('#rt_stop').disabled = !r.running;
+  clearTimeout(rtTimer); if (r.running || r.results?.some(x => x.status === 'en attente…')) rtTimer = setTimeout(refreshRt, 3000);
+  if (!r.results?.length) { $('#rt_res').innerHTML = ''; return; }
+  const ok = r.results.filter(x => x.status.startsWith('remis')).length, done = r.results.filter(x => x.status !== 'en attente…').length;
+  $('#rt_res').innerHTML = `<div class="tiles"><div class="tile"><b>${ok}/${r.results.length}</b><small>remis à ${esc(r.name)}${done ? ' · ' + Math.round(ok / done * 100) + ' %' : ''}</small></div>
+    <div class="tile"><b>${r.running ? `${r.sent}/${r.count}` : 'terminé'}</b><small>${r.running ? 'envoyés' : 'test du ' + fmtT(r.started)}</small></div></div>
+    <div class="tw" style="margin-top:8px"><table><tr><th>#</th><th>Heure</th><th>Résultat</th><th>SNR accusé</th><th>Aller-retour</th></tr>${r.results.slice().reverse().map(x =>
+    `<tr><td class="mono">${x.n}</td><td class="mono">${new Date(x.ts * 1000).toLocaleTimeString('fr-FR')}</td><td>${esc(x.status)}</td>
+     <td class="mono" style="white-space:nowrap">${x.snr != null ? fmtN(x.snr) + ' dB' + snrBars(x.snr) : '–'}</td><td class="mono">${x.rtt != null ? x.rtt + ' s' : '–'}</td></tr>`).join('')}</table></div>`;
+}
+$('#rt_go').addEventListener('click', async () => { const to = $('#rt_to').value; if (!to) return toast('Choisis un nœud');
+  if (!confirm(`Envoyer ${$('#rt_n').value} messages de test à ${nm(to)} ?`)) return;
+  if (await act('/api/rangetest/start', {to, interval: +$('#rt_int').value, count: +$('#rt_n').value}, 'Test de portée lancé')) setTimeout(refreshRt, 500); });
+$('#rt_stop').addEventListener('click', async () => { await act('/api/rangetest/stop', {}, 'Test arrêté'); setTimeout(refreshRt, 500); });
+
+// ------------------------------------------------------------------ outils : sauvegarde
+let BK = null;
+$('#bk_file').addEventListener('change', async e => { const f = e.target.files[0]; BK = null; $('#bk_parts').hidden = true; if (!f) return;
+  try { BK = JSON.parse(await f.text()); if (BK.app !== 'mesh-node') throw new Error('fichier non reconnu');
+    $('#bk_info').textContent = `Sauvegarde du ${BK.date} · ${BK.owner?.long_name} (${BK.node_id}, ${BK.hw}) · ${BK.lora?.region} ${BK.lora?.modem_preset}`;
+    $('#bk_parts').hidden = false;
+  } catch(x){ $('#bk_info').textContent = '⚠️ ' + x.message; } });
+$('#bk_go').addEventListener('click', async () => { if (!BK) return;
+  const parts = [...document.querySelectorAll('#bk_parts input:checked')].map(i => i.value); if (!parts.length) return;
+  if (!confirm('Restaurer : ' + parts.join(', ') + ' ?')) return;
+  $('#bk_go').disabled = true;
+  try { const r = await api('/api/restore', {backup: BK, parts}); toast('Restauré : ' + r.done.join(', ')); formDone = false; }
+  catch(e){ toast('⚠️ ' + e.message); }
+  $('#bk_go').disabled = false; });
+
+// ------------------------------------------------------------------ outils : notifications
+async function loadNotif(){
+  let c; try { c = await api('/api/notif'); } catch(e){ return; }
+  $('#nf_en').checked = c.enabled; $('#nf_srv').value = c.service; $('#nf_url').value = c.ntfy_server; $('#nf_topic').value = c.ntfy_topic;
+  $('#nf_tok').value = ''; $('#nf_tok').placeholder = c.has_ntfy_token ? '•••••• (enregistré)' : '';
+  $('#nf_tgtok').value = ''; $('#nf_tgtok').placeholder = c.has_tg_token ? '•••••• (enregistré)' : ''; $('#nf_chat').value = c.tg_chat;
+  $('#nf_dm').checked = c.on_dm; $('#nf_ch').checked = c.on_channel; $('#nf_new').checked = c.on_new_node; $('#nf_re').checked = c.on_reaction;
+  nfToggle(); }
+const nfToggle = () => { $('#nf_ntfy').hidden = $('#nf_srv').value !== 'ntfy'; $('#nf_tg').hidden = $('#nf_srv').value !== 'telegram'; };
+$('#nf_srv').addEventListener('change', nfToggle);
+$('#nf_gen').addEventListener('click', () => { const a = new Uint8Array(9); crypto.getRandomValues(a);
+  $('#nf_topic').value = 'mesh-' + [...a].map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 16); });
+const nfSave = () => api('/api/notif', {enabled: $('#nf_en').checked, service: $('#nf_srv').value, ntfy_server: $('#nf_url').value.trim() || 'https://ntfy.sh',
+  ntfy_topic: $('#nf_topic').value.trim(), ntfy_token: $('#nf_tok').value.trim(), tg_token: $('#nf_tgtok').value.trim(), tg_chat: $('#nf_chat').value.trim(),
+  on_dm: $('#nf_dm').checked, on_channel: $('#nf_ch').checked, on_new_node: $('#nf_new').checked, on_reaction: $('#nf_re').checked});
+$('#nf_save').addEventListener('click', async () => { try { await nfSave(); toast('Notifications enregistrées'); loadNotif(); } catch(e){ toast('⚠️ ' + e.message); } });
+$('#nf_test').addEventListener('click', async () => { try { await nfSave(); await api('/api/notif/test', {}); toast('Notification de test envoyée'); } catch(e){ toast('⚠️ ' + e.message); } });
+
+// ------------------------------------------------------------------ événements (nouveaux nœuds)
+let evSeq = null;
+async function pollEvents(){
+  let r; try { r = await api('/api/events?after=' + (evSeq ?? 0)); } catch(e){ return; }
+  if (evSeq !== null) r.events.forEach(e => { if (e.kind === 'new_node') { toast(`🆕 Nouveau nœud : ${e.name}`); refreshNodes(); } });
+  evSeq = r.seq;
+}
+
+// ------------------------------------------------------------------ onglets
+function showTab(t){
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('act', b.dataset.t === t));
+  ['chat','nodes','map','pkts','stats','tools','cfg'].forEach(x => $('#t_' + x).hidden = x !== t);
+  if (t === 'stats') renderStats(); if (t === 'tools') { fillRtNodes(); refreshRt(); loadNotif(); }
+  if (t === 'map') renderMap(); if (t === 'pkts') renderPackets(); if (t === 'cfg') formDone = false, refreshStatus();
+  if (t === 'chat') renderThread(true);
+}
+document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.t)));
+
+(async () => { await refreshStatus(); await refreshNodes(); await refreshMessages(); renderThread(true); })();
+setInterval(refreshStatus, 4000);
+setInterval(refreshMessages, 1500);
+setInterval(refreshPackets, 2000);
+setInterval(refreshNodes, 20000);
+pollEvents(); setInterval(pollEvents, 5000);
+setInterval(() => { if (!$('#t_stats').hidden) renderStats(); }, 120000);
+</script>
+</body>
+</html>

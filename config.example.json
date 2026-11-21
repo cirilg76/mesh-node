@@ -1,0 +1,12 @@
+{
+  "home": {
+    "name": "Chez moi",
+    "lat": 48.8584,
+    "lon": 2.2945,
+    "alt": 35
+  },
+  "lora_mesh": {
+    "db": "~/lora-mesh/data/mesh.db",
+    "port": 8088
+  }
+}

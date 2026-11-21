@@ -372,6 +372,7 @@ function geo(a, b){ // distance km + cap
   const brg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   return {km: 2 * R * Math.asin(Math.sqrt(h)), brg, dir: ['N','NE','E','SE','S','SO','O','NO'][Math.round(brg / 45) % 8]};
 }
+const onUSB = te => { const b = te.filter(r => r[1] != null); return b.length > 0 && b.filter(r => r[1] > 100).length >= b.length / 2; };
 const myPos = () => { const p = ST?.me?.position; return p && p.latitude ? [p.latitude, p.longitude] : null; };
 const nodeGeo = n => { const me = myPos(); return me && n && n.lat && n.lon && !n.me ? geo(me, [n.lat, n.lon]) : null; };
 const geoTxt = g => g ? `${fmtN(g.km, g.km < 10 ? 1 : 0)} km ${g.dir}` : '–';
@@ -698,7 +699,7 @@ async function openNode(id){
   if (!n.me) { blocks.push(['snr', chartBlock('SNR', 'dB · plus haut = mieux'), rx.map(r => [r[0], r[1]]), {unit: 'dB', minSpan: 4}]);
     blocks.push(['rssi', chartBlock('Puissance reçue (RSSI)', 'dBm'), rx.map(r => [r[0], r[2] || null]), {unit: 'dBm', dec: 0, minSpan: 6}]);
     blocks.push(['hops', chartBlock('Sauts', 'nombre de relais'), rx.map(r => [r[0], r[3]]), {unit: 'saut(s)', dec: 0, min: 0, minSpan: 2}]); }
-  const bat = te.filter(r => r[1] != null && r[1] <= 100);
+  const bat = onUSB(te) ? [] : te.filter(r => r[1] != null && r[1] <= 100);
   if (bat.length) blocks.push(['bat', chartBlock('Batterie', '%'), bat.map(r => [r[0], r[1]]), {unit: '%', dec: 0, min: 0, max: 100, area: true}]);
   if (te.some(r => r[2])) blocks.push(['v', chartBlock('Tension', 'V'), te.map(r => [r[0], r[2] || null]), {unit: 'V', dec: 2, minSpan: .2}]);
   if (n.me) { blocks.push(['cu', chartBlock('Occupation du canal', '% du temps'), te.map(r => [r[0], r[3]]), {unit: '%', min: 0, minSpan: 2, area: true}]);
@@ -711,7 +712,7 @@ async function openNode(id){
 async function renderMe(){
   const id = myId(); if (!id) return;
   let h; try { h = await api(`/api/history?node=${encodeURIComponent(id)}&hours=${SEG.me}`); } catch(e){ return; }
-  const te = h.telem, t0 = Date.now()/1000 - SEG.me * 3600, bat = te.filter(r => r[1] != null && r[1] <= 100), usb = te.length && !bat.length;
+  const te = h.telem, t0 = Date.now()/1000 - SEG.me * 3600, usb = onUSB(te), bat = usb ? [] : te.filter(r => r[1] != null && r[1] <= 100);
   const B = [chartBlock('Batterie', usb ? 'alimenté par USB' : '%'), chartBlock('Tension', 'V'), chartBlock('Occupation du canal', '% du temps'),
     chartBlock('Mon temps d\'émission', '% de l\'heure')];
   $('#s_me').innerHTML = (te.length ? '' : '<div class="hint">Une mesure est enregistrée toutes les 5 minutes : les courbes se rempliront au fil du temps.</div>') + B.map(b => b.html).join('');

@@ -439,7 +439,11 @@ function barChart(el, items, o = {}){
   const H = o.h || 110, m = {l: 30, r: 6, t: 8, b: 18};
   const {W, svg, tip} = chartBase(el, H);
   svg.setAttribute('aria-label', o.label || 'graphique en barres');
-  const hi = Math.max(...items.map(i => i.v)), ticks = niceTicks(0, hi), top = ticks[ticks.length - 1] || 1;
+  const hi = Math.max(...items.map(i => i.v)), ticks = niceTicks(0, hi);
+  // l'axe doit toujours dépasser la plus haute barre (sinon elle sort du graphique et masque le titre)
+  const step = ticks.length > 1 ? ticks[1] - ticks[0] : (hi || 1);
+  while (ticks[ticks.length - 1] < hi) ticks.push(+(ticks[ticks.length - 1] + step).toFixed(6));
+  const top = ticks[ticks.length - 1] || 1;
   const Y = v => m.t + (top - v) / top * (H - m.t - m.b);
   ticks.forEach(v => { svgEl('line', {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: 'gl'}, svg);
     svgEl('text', {x: m.l - 5, y: Y(v) + 3, 'text-anchor': 'end', class: 'ax'}, svg).textContent = fmtN(v, 0); });

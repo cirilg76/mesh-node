@@ -43,22 +43,22 @@ select,input,textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid v
 .hint{font-size:12px;color:var(--muted);margin-top:6px}
 .grid2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 /* chat */
-.chat{display:grid;grid-template-columns:260px 1fr;gap:0;height:calc(100vh - 150px);min-height:420px;padding:0;overflow:hidden}
-@media (max-width:760px){.chat{grid-template-columns:1fr;height:auto}.convs{max-height:170px}.thread{height:60vh}}
+.chat{display:grid;grid-template-columns:260px 1fr;grid-template-rows:minmax(0,1fr);gap:0;height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:360px;padding:0;overflow:hidden}
+@media (max-width:760px){.chat{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.convs{max-height:130px;border-right:0;border-bottom:1px solid var(--line)}}
 .convs{border-right:1px solid var(--line);overflow:auto}
 .conv{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
 .conv.act{background:var(--chip)}
 .conv .t{font-weight:600;display:flex;gap:6px;align-items:center}
 .conv .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge{background:var(--accent);color:var(--accent-fg);border-radius:99px;font-size:11px;padding:0 6px;margin-left:auto}
-.thread{display:flex;flex-direction:column;min-width:0}
+.thread{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .thead{padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
-.msgs{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.msgs{flex:1;min-height:0;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .b{max-width:78%;padding:7px 11px;border-radius:12px;background:var(--chip);align-self:flex-start;word-wrap:break-word;white-space:pre-wrap}
 .b.out{background:var(--me);align-self:flex-end}
 .b .who{font-size:12px;font-weight:600;color:var(--accent)}
 .b .meta{font-size:11px;color:var(--muted);margin-top:2px}
-.composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);flex:none}
 .composer textarea{resize:none;height:42px}
 .cnt{font-size:11px;color:var(--muted);align-self:center;min-width:52px;text-align:right}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -844,6 +844,17 @@ setInterval(refreshPackets, 2000);
 setInterval(refreshNodes, 20000);
 pollEvents(); setInterval(pollEvents, 5000);
 setInterval(() => { if (!$('#t_stats').hidden) renderStats(); }, 120000);
+
+// Ajuste la hauteur du chat à l'écran réel (en-tête variable, mobile, zoom)
+function fitChat(){ const c = document.querySelector('.chat'); if (!c || !c.offsetParent) return;
+  const top = c.getBoundingClientRect().top + window.scrollY;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  c.style.height = Math.max(360, Math.floor(vh - top - 16)) + 'px'; }
+window.addEventListener('resize', fitChat);
+if (window.visualViewport) visualViewport.addEventListener('resize', fitChat);
+new ResizeObserver(fitChat).observe(document.querySelector('header'));
+document.querySelector('#nav').addEventListener('click', () => setTimeout(fitChat, 0));
+setTimeout(fitChat, 0);
 </script>
 </body>
 </html>
